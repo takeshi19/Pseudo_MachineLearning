@@ -38,26 +38,27 @@
 void cleanData(std::ifstream &inFile, std::ofstream &outFile,
                std::unordered_set<std::string> &stopwords) {
 	
-	std::string line; 		    //Each line of the file to clean. 
-	std::vector<std::string>::iterator it;
+  std::string line; 		    //Each line of the file to clean. 
+  std::vector<std::string>::iterator it;
 	
-	while (std::getline(inFile, line)) {
-		replaceHyphensWithSpaces(line);
-		std::vector<std::string> instrings;  //Resulting vector after splitLine() call
-		splitLine(line, instrings);
+  while (std::getline(inFile, line)) {
+    replaceHyphensWithSpaces(line);
+    std::vector<std::string> instrings;  //Resulting vector after splitLine() call
+    splitLine(line, instrings);
 	
-		std::vector<std::string> outstrings; //Vector of strings to be cleansed.
-		removePunctuation(instrings, outstrings);
-		removeWhiteSpaces(outstrings);     
-		removeEmptyWords(outstrings);
-		removeSingleLetterWords(outstrings);
-		removeStopWords(outstrings, stopwords);
-		
-		for (it = outstrings.begin(); it != outstrings.end(); it++) 				   
-			outFile << *it << " "; 	     //Writing cleansed data to file.
-		outFile << "\n";		     //New line to separate next review.
-	}
-	outFile.close();  			     //Closing file for proper reaccess.	
+    std::vector<std::string> outstrings; //Vector of strings to be cleansed.
+    removePunctuation(instrings, outstrings);
+    removeWhiteSpaces(outstrings);     
+    removeEmptyWords(outstrings);
+    removeSingleLetterWords(outstrings);
+    removeStopWords(outstrings, stopwords);
+    
+    for (it = outstrings.begin(); it != outstrings.end(); it++) {				      
+      outFile << *it << " "; 	     //Writing cleansed data to file.
+    }
+    outFile << "\n";		     //New line to separate next review.
+  }
+  outFile.close();  	             //Closing file for proper reaccess.	
 }
 
 /**
@@ -72,24 +73,26 @@ void cleanData(std::ifstream &inFile, std::ofstream &outFile,
 void fillDictionary(std::ifstream &newInFile,
                     std::unordered_map<std::string, std::pair<long, long>> &dict) {
 	
-	std::string line; //Stores each line of fil.
-	std::string word; //Individual word per line.
-	int count = 0; 	  //The amount of times word has been detected in file.
-	int rating = 0;   //Movie rating per line.
-	
-	while (std::getline(newInFile, line)) {
-		std::stringstream ss(line);
-		while (ss >> word) {
-			if (word.find_first_not_of("0123456789") == std::string::npos) {
-				rating = atoi(word.c_str());  //Update the rating.
-				continue;		      //Skip to next word after reading in rating #.
-			}
-			if (dict.find(word) == dict.end())    //If new word, store it as a new key in dict. 
-				dict[word] = std::make_pair(rating, count + 1);  
-			else 				      //Repeated occurrence of key, then update values (rating, count).
-				dict[word] = std::make_pair(dict[word].first + rating, dict[word].second + 1);
-		}
-	}
+  std::string line; //Stores each line of fil.
+  std::string word; //Individual word per line.
+
+  int rating = 0;   //Movie rating per line.
+  
+  while (std::getline(newInFile, line)) {
+    std::stringstream ss(line);
+    while (ss >> word) {
+      if (word.find_first_not_of("0123456789") == std::string::npos) {
+	rating = atoi(word.c_str());  //Update the rating.
+	continue;		      //Skip to next word after reading in rating #.
+      }
+      if (dict.find(word) == dict.end())
+        dict[word] = std::make_pair(rating, 1);  //1, for 1 current occurrence.
+      else {
+	dict[word].first += rating;  //Conjoin the ratings.
+	dict[word] = std::make_pair(dict[word].first, ++dict[word].second);
+      }
+    }
+  }
 }
 
 /**
@@ -101,9 +104,9 @@ void fillDictionary(std::ifstream &newInFile,
 void fillStopWords(std::ifstream &inFile,
                    std::unordered_set<std::string> &stopwords) {
 	
-	std::string line; //Line of text file that contains each stopword.
-	while (std::getline(inFile, line))   
-		stopwords.insert(line); //Move stopwords from file into unordered set.
+  std::string line; //Line of text file that contains each stopword.
+  while (std::getline(inFile, line))   
+    stopwords.insert(line); //Move stopwords from file into unordered set.
 }
 
 /**
@@ -117,25 +120,30 @@ void fillStopWords(std::ifstream &inFile,
 void rateReviews(std::ifstream &testFile,
                  std::unordered_map<std::string, std::pair<long, long>> &dict,
                  std::ofstream &ratingsFile) {
-	std::string line; //Line per testFile (cleanReviews.txt).
-	std::string word; //Word per line of file.
+  std::string line; //Line per testFile (cleanReviews.txt).
+  std::string word; //Word per line of file.
 	
-	while (std::getline(testFile, line)) {
-		std::stringstream ss(line);
+  while (std::getline(testFile, line)) {
+    std::stringstream ss(line);
+    double sum = 0;
+    double count = 0;
+      
+      while (ss >> word) {
+	if (dict.find(word) == dict.end())  
+	  sum += 2; //Value is always 2 if empty rating or new word.
+	else 
+	  sum += (dict[word].first*1.0 / dict[word].second);
+	count++;	  //Increment count of words found per line.
+      }
+      //Write this data per line to an output file (round 2 deci-places).
+     if (count == 0) {//When while loop doesnt exe and line empty.
+	sum += 2;
+     	++count;
+     }
 
-		double sum = 0;
-		double count = 0;
-		while (ss >> word) {
-			if (dict.find(word) == dict.end() || line.empty()) 
-				sum += 2; //Value is always 2 if empty rating or new word.
-			else 
-				sum += dict[word].first / dict[word].second;
-			count++;	  //Increment count of words found per line.
-		}
-		//Write this data per line to an output file (round 2 deci-places).
-		ratingsFile << std::setprecision(2) << std::fixed << sum/count << "\n";
-	}
-	ratingsFile.close();
+     ratingsFile << std::setprecision(2) << std::fixed << (sum/count) << "\n";
+  }
+  ratingsFile.close();
 }
 
 /**
@@ -162,17 +170,17 @@ void removeEmptyWords(std::vector<std::string> &tokens) {
  */
 void removePunctuation(std::vector<std::string> &inTokens,
                        std::vector<std::string> &outTokens) {
-	
-	std::vector<std::string>::iterator it; 	     //Iterator to the words of file line.
-	for (it = inTokens.begin(); it != inTokens.end(); it++) {
-		for (int i = 0, len = (*it).size(); i < len; i++) {
-			if (ispunct((*it).at(i))) { //FIXME Bughive: wtf did you do with ur loops. 
-				(*it).erase(i--, 1); //Remove any detect punct. from word.
-				len = (*it).size();  //update smaller size of word.
-			}
-		}
-		outTokens.push_back(*it);     	     //Store the unpunctuated strings to outTokens.	
-	}
+ 
+  std::vector<std::string>::iterator it; //Iterator to the words of file line.
+  for (it = inTokens.begin(); it != inTokens.end(); it++) {
+    for (int i = 0, len = (*it).size(); i < len; i++) {
+      if (ispunct((*it).at(i))) { 
+	(*it).erase(i--, 1); //Remove any detect punct. from word.
+	len = (*it).size();  //update smaller size of word.
+      }
+     }
+     outTokens.push_back(*it);       //Store the unpunctuated strings to outTokens.	
+    }
 }
 
 /**
@@ -182,14 +190,13 @@ void removePunctuation(std::vector<std::string> &inTokens,
  *
  * @param tokens The string vector to remove single letters from. 
  */
-//FIXME code looks buggy.
-//TODO use the style that worked in removeEmptyWords.
 void removeSingleLetterWords(std::vector<std::string> &tokens) {
+
   for (int i = 0; i < tokens.size(); i++) { //If word is 1 char or empty, remove it.
     if (tokens.at(i).length() == 1) {
       //If end of string is reached & only digits found, then ignore.
-	if (!(tokens.at(i).find_first_not_of("0123456789") == std::string::npos))
-	  tokens.erase(tokens.begin() + i);
+      if (!(tokens.at(i).find_first_not_of("0123456789") == std::string::npos))
+        tokens.erase(tokens.begin() + i);
     }
   }
 }
@@ -227,7 +234,7 @@ void removeWhiteSpaces(std::vector<std::string> &tokens) {
  * @param line The line of the file to replace hyphens with.
  */
 void replaceHyphensWithSpaces(std::string &line) {
-	std::replace(line.begin(), line.end(), '-', ' ');
+  std::replace(line.begin(), line.end(), '-', ' ');
 }
 
 /**
@@ -238,25 +245,15 @@ void replaceHyphensWithSpaces(std::string &line) {
  * @param words Vector of substrings after splitting.
  */
 void splitLine(std::string &line, std::vector<std::string> &words) {
-	//std::stringstream ss(line); //Input string stream to receive and split string.
-	std::string item; 	      //The substrings were are getting from splitting.
-	
-	std::stringstream ss(line);
-	while (ss >> item) {
-	
-		words.push_back(item);
-	}
-
-	std::cout << "Reached past while loop in splitLine()\n";
-//	std::vector<std::string> newvec;
-	//**Store substrings of line into words- use whitespace as a delimitation sequence.**	
-	//while (std::getline(ss, item, ' ')) { 
-	//	newvec.push_back(substr); //FIXME here is our problem..		
-	//}
-//	newvec.swap(words);
-//	newvec.clear();
+  std::string item; 	      //The substrings were are getting from splitting.
+  std::stringstream ss(line);
+  
+  while (ss >> item) {
+    words.push_back(item);
+  }
+  std::cout <<"Here are all of the strings stored in  splitline words vector: \n";
+  for (auto it = words.begin(); it != words.end(); it++) {
+	std::cout << *it << ", \n";	
+  } 
+  std::cout << "**END of splitLine call**\n";
 }
-
-
-
-
