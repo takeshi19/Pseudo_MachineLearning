@@ -89,7 +89,6 @@ void fillDictionary(std::ifstream &newInFile,
 			else 				      //Repeated occurrence of key, then update values (rating, count).
 				dict[word] = std::make_pair(dict[word].first + rating, dict[word].second + 1);
 		}
-		std::cout << "in fDict\n";
 	}
 }
 
@@ -121,7 +120,6 @@ void rateReviews(std::ifstream &testFile,
 	std::string line; //Line per testFile (cleanReviews.txt).
 	std::string word; //Word per line of file.
 	
-	std::cout << "rateReviews isn't the problem\n";
 	while (std::getline(testFile, line)) {
 		std::stringstream ss(line);
 
@@ -141,18 +139,19 @@ void rateReviews(std::ifstream &testFile,
 }
 
 /**
- * @brief Removes empty words from vector of strings. Empty strings are
- *  	  strings that are pure whitespace or have length of 0. 
+ * @brief Removes empty words from vector of strings. E
  * 
  * @param tokens, The vector of strings to remove empty words from.
  */
 void removeEmptyWords(std::vector<std::string> &tokens) {
-	int i; //Record position to remove empty strings from.
-	std::cout << "rew\n";
-	for (int i = 0; i != tokens.size(); i++) {
-		if (tokens.at(i).empty()) 
-			tokens.erase(tokens.begin() + i);
-	}
+
+ struct StringIsEmpty {
+    bool operator()(const std::string& str) {
+        return str.empty();
+    }
+  };
+
+  tokens.erase(std::remove_if(tokens.begin(), tokens.end(), StringIsEmpty()), tokens.end());
 }
 
 /**
@@ -165,10 +164,9 @@ void removePunctuation(std::vector<std::string> &inTokens,
                        std::vector<std::string> &outTokens) {
 	
 	std::vector<std::string>::iterator it; 	     //Iterator to the words of file line.
-	std::cout << "rmp\n";
 	for (it = inTokens.begin(); it != inTokens.end(); it++) {
 		for (int i = 0, len = (*it).size(); i < len; i++) {
-			if (ispunct((*it).at(i))) {
+			if (ispunct((*it).at(i))) { //FIXME Bughive: wtf did you do with ur loops. 
 				(*it).erase(i--, 1); //Remove any detect punct. from word.
 				len = (*it).size();  //update smaller size of word.
 			}
@@ -184,15 +182,16 @@ void removePunctuation(std::vector<std::string> &inTokens,
  *
  * @param tokens The string vector to remove single letters from. 
  */
+//FIXME code looks buggy.
+//TODO use the style that worked in removeEmptyWords.
 void removeSingleLetterWords(std::vector<std::string> &tokens) {
-	std::cout << "rslw\n";
-	for (int i = 0; i != tokens.size(); i++) { //If word is 1 char or empty, remove it.
-		if (tokens.at(i).length() == 1) {
-			//If end of string is reached & only digits found, then ignore.
-			if (!(tokens.at(i).find_first_not_of("0123456789") == std::string::npos))
-				tokens.erase(tokens.begin() + i);
-		}
-	}
+  for (int i = 0; i < tokens.size(); i++) { //If word is 1 char or empty, remove it.
+    if (tokens.at(i).length() == 1) {
+      //If end of string is reached & only digits found, then ignore.
+	if (!(tokens.at(i).find_first_not_of("0123456789") == std::string::npos))
+	  tokens.erase(tokens.begin() + i);
+    }
+  }
 }
 
 /**
@@ -200,19 +199,14 @@ void removeSingleLetterWords(std::vector<std::string> &tokens) {
  * 
  * @param tokens The vector to remove possible stopwords from.
  * @param stopwords The set of stopwords that'll be removed from tokens.
- */
+ */  
 void removeStopWords(std::vector<std::string> &tokens,
                      std::unordered_set<std::string> &stopwords) {
-	std::vector<std::string>::iterator it1;        //Iterator to vector
-	std::unordered_set<std::string>::iterator it2; //Iterator to u_set
-	int i;					       //Record position of stopword to remove from tokens.
-	std::cout << "rsw\n";
-	for (i = 0, it1 = tokens.begin(); it1 != tokens.end(); i++, it1++) {
-		for (it2 = stopwords.begin(); it2 != stopwords.end(); it2++) {
-			if ((*it1).compare(*it2) == 0) //If stopword found, remove from vector.
-				tokens.erase(tokens.begin() + i);
-		}	
-	}
+
+  //Remove all elements of tokens that are held in stopwords:
+  tokens.erase( remove_if (begin(tokens), end(tokens), 
+      [&](std::string x) { return find(begin(stopwords), end(stopwords), x) 
+          != end(stopwords);}), end(tokens) );
 }
 
 /**
@@ -222,10 +216,8 @@ void removeStopWords(std::vector<std::string> &tokens,
  * @param tokens String vector of words to remove whitespace from.
  */
 void removeWhiteSpaces(std::vector<std::string> &tokens) {
-	std::vector<std::string>::iterator it; //Iterator to string vector tokens.
-	std::cout << "rws\n";
-	for (it = tokens.begin(); it != tokens.end(); it++)  
-		trim(*it);
+  for (auto it = tokens.begin(); it != tokens.end(); it++)  
+    trim(*it);
 }
 
 /**
@@ -236,7 +228,6 @@ void removeWhiteSpaces(std::vector<std::string> &tokens) {
  */
 void replaceHyphensWithSpaces(std::string &line) {
 	std::replace(line.begin(), line.end(), '-', ' ');
-	std::cout <<"rhs\n";
 }
 
 /**
@@ -249,11 +240,14 @@ void replaceHyphensWithSpaces(std::string &line) {
 void splitLine(std::string &line, std::vector<std::string> &words) {
 	//std::stringstream ss(line); //Input string stream to receive and split string.
 	std::string item; 	      //The substrings were are getting from splitting.
-
+	
 	std::stringstream ss(line);
 	while (ss >> item) {
+	
 		words.push_back(item);
 	}
+
+	std::cout << "Reached past while loop in splitLine()\n";
 //	std::vector<std::string> newvec;
 	//**Store substrings of line into words- use whitespace as a delimitation sequence.**	
 	//while (std::getline(ss, item, ' ')) { 
