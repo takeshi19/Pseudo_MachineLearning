@@ -75,15 +75,27 @@ void fillDictionary(std::ifstream &newInFile,
 	
   std::string line; //Stores each line of fil.
   std::string word; //Individual word per line.
-
   int rating = 0;   //Movie rating per line.
   
-  while (std::getline(newInFile, line)) {
+/*  struct isSingleLetter {
+    bool operator()(const std::string& str) {
+	return str.length() == 1 && !(std::all_of(str.begin(), str.end(), ::isdigit)); 
+    }
+  };
+  */while (std::getline(newInFile, line)) {
     std::stringstream ss(line);
     while (ss >> word) {
-      if (word.find_first_not_of("0123456789") == std::string::npos) {
-	rating = atoi(word.c_str());  //Update the rating.
-	continue;		      //Skip to next word after reading in rating #.
+	//FIXME on this shit: I think I found the bug:
+	//"1 felt trapped obvious escape entire 100 minutes"
+     	//The above line is a review, we scan the "100" as a rating because it's a digit, then store it in ratings...
+	//BAD BAD BAD. NOT SUPPOSED TO HAPPEN. **all ratings are only 1 char in length().** 
+      //All ratings have a char-count of 1, and are digits:
+      if (word.length() == 1) {
+        if (std::all_of(word.begin(), word.end(), ::isdigit)) {	
+          std::cout << word << "\n";
+	  rating = atoi(word.c_str());  //Update the rating.
+	  continue;		      //Skip to next word after reading in rating #.
+        }	
       }
       if (dict.find(word) == dict.end())
         dict[word] = std::make_pair(rating, 1);  //1, for 1 current occurrence.
@@ -93,6 +105,7 @@ void fillDictionary(std::ifstream &newInFile,
       }
     }
   }
+  
 }
 
 /**
@@ -120,28 +133,38 @@ void fillStopWords(std::ifstream &inFile,
 void rateReviews(std::ifstream &testFile,
                  std::unordered_map<std::string, std::pair<long, long>> &dict,
                  std::ofstream &ratingsFile) {
+ 
   std::string line; //Line per testFile (cleanReviews.txt).
   std::string word; //Word per line of file.
-	
+  
+ /* std::cout << "Printing out the contents of the map called dict: \n";
+  for (auto it = dict.begin(); it != dict.end(); it++) {
+	std::cout << "Word in dict: " << it->first << "\n";
+ 	std::cout << "total_rating for word: " << it->second.first << "\n";
+ 	std::cout << "total_count for word: " << it->second.second << "\n";
+  }	*/
+//FIXME u have errors with reading empty lines, big time: 
+
   while (std::getline(testFile, line)) {
     std::stringstream ss(line);
-    double sum = 0;
+    double ratingsSum = 0;
     double count = 0;
-      
-      while (ss >> word) {
-	if (dict.find(word) == dict.end())  
-	  sum += 2; //Value is always 2 if empty rating or new word.
-	else 
-	  sum += (dict[word].first*1.0 / dict[word].second);
-	count++;	  //Increment count of words found per line.
-      }
-      //Write this data per line to an output file (round 2 deci-places).
-     if (count == 0) {//When while loop doesnt exe and line empty.
-	sum += 2;
-     	++count;
-     }
 
-     ratingsFile << std::setprecision(2) << std::fixed << (sum/count) << "\n";
+    //If the ratings (file line) has words in it, analyze them: 
+    while (ss >> word) {
+      if (dict.find(word) == dict.end())  
+        ratingsSum += 2; //Value is always 2 if unique word.
+      else 
+        ratingsSum += ((dict[word].first*1.0) / dict[word].second);
+      count++;	  //Increment count of words found per line.
+    }
+    //Giving a whole review, thats empty, a neutral rating.
+    if (count == 0) {
+	ratingsSum = 2;
+	++count;
+    }
+    //Write this data per line to an output file (round 2 deci-places).
+    ratingsFile << std::setprecision(2) << std::fixed << (ratingsSum/count) << "\n";
   }
   ratingsFile.close();
 }
@@ -191,14 +214,15 @@ void removePunctuation(std::vector<std::string> &inTokens,
  * @param tokens The string vector to remove single letters from. 
  */
 void removeSingleLetterWords(std::vector<std::string> &tokens) {
-
-  for (int i = 0; i < tokens.size(); i++) { //If word is 1 char or empty, remove it.
-    if (tokens.at(i).length() == 1) {
-      //If end of string is reached & only digits found, then ignore.
-      if (!(tokens.at(i).find_first_not_of("0123456789") == std::string::npos))
-        tokens.erase(tokens.begin() + i);
+  
+  //If the LETTER is of length, it is removable.
+  struct isSingleLetter {
+    bool operator()(const std::string& str) {
+	return str.length() == 1 && !(std::all_of(str.begin(), str.end(), ::isdigit)); 
     }
-  }
+  };
+  
+  tokens.erase(std::remove_if(tokens.begin(), tokens.end(), isSingleLetter()), tokens.end()); 
 }
 
 /**
@@ -223,6 +247,7 @@ void removeStopWords(std::vector<std::string> &tokens,
  * @param tokens String vector of words to remove whitespace from.
  */
 void removeWhiteSpaces(std::vector<std::string> &tokens) {
+  
   for (auto it = tokens.begin(); it != tokens.end(); it++)  
     trim(*it);
 }
@@ -234,6 +259,7 @@ void removeWhiteSpaces(std::vector<std::string> &tokens) {
  * @param line The line of the file to replace hyphens with.
  */
 void replaceHyphensWithSpaces(std::string &line) {
+  
   std::replace(line.begin(), line.end(), '-', ' ');
 }
 
@@ -245,15 +271,11 @@ void replaceHyphensWithSpaces(std::string &line) {
  * @param words Vector of substrings after splitting.
  */
 void splitLine(std::string &line, std::vector<std::string> &words) {
+  
   std::string item; 	      //The substrings were are getting from splitting.
   std::stringstream ss(line);
   
   while (ss >> item) {
     words.push_back(item);
   }
-  std::cout <<"Here are all of the strings stored in  splitline words vector: \n";
-  for (auto it = words.begin(); it != words.end(); it++) {
-	std::cout << *it << ", \n";	
-  } 
-  std::cout << "**END of splitLine call**\n";
 }
